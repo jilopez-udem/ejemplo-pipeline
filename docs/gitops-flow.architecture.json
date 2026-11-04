@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Flujo GitOps con ArgoCD y minikube",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1340,
+      620
+    ],
+    "views": [
+      {
+        "id": "ci",
+        "label": "1 · CI en GitHub Actions",
+        "focus": [
+          "dev",
+          "repo",
+          "build",
+          "hub"
+        ],
+        "note": "Un push a gitops-argocd dispara el workflow: build multi-arch (amd64+arm64) y push sha-xxxxxxx + latest a Docker Hub."
+      },
+      {
+        "id": "gitops-commit",
+        "label": "2 · Git como fuente de verdad",
+        "focus": [
+          "build",
+          "manifests",
+          "repo"
+        ],
+        "note": "update-manifests cambia el tag en k8s/deployment.yaml con sed y el bot hace commit. paths-ignore k8s/** evita el bucle."
+      },
+      {
+        "id": "cd",
+        "label": "3 · CD con ArgoCD",
+        "focus": [
+          "repo",
+          "argocd",
+          "ui",
+          "deploy"
+        ],
+        "note": "ArgoCD consulta Git cada ~3 min, ve el commit (OutOfSync) y aplica k8s/ en el namespace cat-gif."
+      },
+      {
+        "id": "runtime",
+        "label": "4 · Rolling update y app",
+        "focus": [
+          "hub",
+          "deploy",
+          "svc",
+          "browser"
+        ],
+        "note": "Kubernetes descarga la imagen nueva, reemplaza los pods y el navegador muestra Versión sha-xxxxxxx."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "dev",
+      "type": "external",
+      "label": "Desarrollador",
+      "sublabel": "git push",
+      "pos": [
+        40,
+        50
+      ],
+      "size": [
+        150,
+        72
+      ]
+    },
+    {
+      "id": "repo",
+      "type": "messagebus",
+      "label": "GitHub repo",
+      "sublabel": "rama gitops-argocd",
+      "brand": "github",
+      "pos": [
+        280,
+        50
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "build",
+      "type": "backend",
+      "label": "build-and-push",
+      "sublabel": "QEMU + Buildx",
+      "brand": "github-actions",
+      "pos": [
+        560,
+        50
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "hub",
+      "type": "database",
+      "label": "Docker Hub",
+      "sublabel": "jilopezv1/cat-gif-app",
+      "brand": "docker",
+      "pos": [
+        860,
+        50
+      ],
+      "size": [
+        180,
+        72
+      ]
+    },
+    {
+      "id": "manifests",
+      "type": "backend",
+      "label": "update-manifests",
+      "sublabel": "sed + commit del bot",
+      "brand": "github-actions",
+      "pos": [
+        560,
+        230
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "argocd-server",
+      "sublabel": "UI · localhost:8080",
+      "brand": "argo",
+      "pos": [
+        40,
+        440
+      ],
+      "size": [
+        150,
+        72
+      ]
+    },
+    {
+      "id": "argocd",
+      "type": "security",
+      "label": "ArgoCD controller",
+      "sublabel": "Application cat-gif-app",
+      "brand": "argo",
+      "pos": [
+        280,
+        440
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "deploy",
+      "type": "backend",
+      "label": "Deployment",
+      "sublabel": "2 réplicas · gunicorn",
+      "brand": "kubernetes",
+      "pos": [
+        860,
+        440
+      ],
+      "size": [
+        180,
+        72
+      ]
+    },
+    {
+      "id": "svc",
+      "type": "cloud",
+      "label": "Service",
+      "sublabel": "NodePort 30080",
+      "brand": "kubernetes",
+      "pos": [
+        1140,
+        440
+      ],
+      "size": [
+        160,
+        72
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Navegador",
+      "sublabel": "Versión sha-xxxxxxx",
+      "pos": [
+        1140,
+        230
+      ],
+      "size": [
+        160,
+        72
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "GitHub (nube)",
+      "wraps": [
+        "repo",
+        "build",
+        "manifests"
+      ],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "minikube · contenedor Docker en tu máquina",
+      "wraps": [
+        "ui",
+        "argocd",
+        "deploy",
+        "svc"
+      ],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "push",
+      "from": "dev",
+      "to": "repo",
+      "label": "git push",
+      "variant": "emphasis"
+    },
+    {
+      "id": "trigger",
+      "from": "repo",
+      "to": "build",
+      "label": "dispara workflow",
+      "variant": "emphasis"
+    },
+    {
+      "id": "image-push",
+      "from": "build",
+      "to": "hub",
+      "label": "push :sha-xxxxxxx",
+      "variant": "emphasis"
+    },
+    {
+      "id": "needs",
+      "from": "build",
+      "to": "manifests",
+      "label": "needs",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        680,
+        176
+      ]
+    },
+    {
+      "id": "bot-commit",
+      "from": "manifests",
+      "to": "repo",
+      "label": "commit nuevo tag",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "labelAt": [
+        480,
+        250
+      ]
+    },
+    {
+      "id": "poll",
+      "from": "argocd",
+      "to": "repo",
+      "label": "poll ~3 min",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "sync",
+      "from": "argocd",
+      "to": "deploy",
+      "label": "sync k8s/ (prune + selfHeal)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pull",
+      "from": "hub",
+      "to": "deploy",
+      "label": "pull imagen",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        992,
+        280
+      ]
+    },
+    {
+      "id": "ui-state",
+      "from": "ui",
+      "to": "argocd",
+      "label": "estado"
+    },
+    {
+      "id": "route",
+      "from": "deploy",
+      "to": "svc",
+      "label": ":5001"
+    },
+    {
+      "id": "http",
+      "from": "svc",
+      "to": "browser",
+      "label": "HTTP",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "CI · GitHub Actions",
+      "items": [
+        "Push a gitops-argocd → build amd64+arm64 → Docker Hub",
+        "El bot fija sha-xxxxxxx en k8s/deployment.yaml"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "CD · ArgoCD",
+      "items": [
+        "Compara Git con el clúster (~3 min) y sincroniza",
+        "selfHeal revierte kubectl manual; git revert = rollback"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "¿Por qué ArgoCD en minikube?",
+      "items": [
+        "Guarda su estado en CRDs de Kubernetes",
+        "minikube (driver docker) ya es un contenedor local"
+      ]
+    }
+  ]
+}
