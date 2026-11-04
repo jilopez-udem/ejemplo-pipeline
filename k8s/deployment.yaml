@@ -18,14 +18,14 @@ spec:
       containers:
         - name: cat-gif-app
           # ⚠️ GitHub Actions actualiza esta línea automáticamente en cada build.
-          image: docker.io/jilopezv1/cat-gif-app:sha-1c76952
+          image: docker.io/jilopezv1/cat-gif-app:sha-6212e71
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5001
           env:
             # ⚠️ También la actualiza GitHub Actions (mismo valor que el tag de la imagen).
             - name: APP_VERSION
-              value: "sha-1c76952"
+              value: "sha-6212e71"
           readinessProbe:
             httpGet:
               path: /healthz
