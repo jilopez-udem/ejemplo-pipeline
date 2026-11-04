@@ -1,0 +1,25 @@
+# Le dice a ArgoCD: "vigila la carpeta k8s/ de la rama gitops-argocd
+# y mantén el clúster igual a lo que hay en Git".
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cat-gif-app
+  namespace: argocd
+  # Al borrar esta Application, ArgoCD también borra los recursos que creó
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jilopez-udem/ejemplo-pipeline.git
+    targetRevision: gitops-argocd
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cat-gif
+  syncPolicy:
+    automated:
+      prune: true     # borra del clúster lo que se borre de Git
+      selfHeal: true  # revierte cambios manuales hechos con kubectl
+    syncOptions:
+      - CreateNamespace=true

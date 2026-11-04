@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cat-gif-app
+  namespace: cat-gif
+  labels:
+    app: cat-gif-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cat-gif-app
+  template:
+    metadata:
+      labels:
+        app: cat-gif-app
+    spec:
+      containers:
+        - name: cat-gif-app
+          # ⚠️ GitHub Actions actualiza esta línea automáticamente en cada build.
+          image: docker.io/jilopezv1/cat-gif-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5001
+          env:
+            # ⚠️ También la actualiza GitHub Actions (mismo valor que el tag de la imagen).
+            - name: APP_VERSION
+              value: "latest"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

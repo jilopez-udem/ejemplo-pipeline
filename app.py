@@ -5,6 +5,9 @@ import time
 
 app = Flask(__name__)
 
+# version shown in the page footer; injected by Kubernetes (see k8s/deployment.yaml)
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
+
 # fallback cat images, used when cataas.com is unavailable
 images = [
     "https://firebasestorage.googleapis.com/v0/b/docker-curriculum.appspot.com/o/catnip%2F0.gif?alt=media&token=0fff4b31-b3d8-44fb-be39-723f040e57fb",
@@ -27,7 +30,13 @@ def index():
     url = f"https://cataas.com/cat/gif?t={int(time.time() * 1000)}"
     # used by the browser if cataas fails to load
     fallback = random.choice(images)
-    return render_template("index.html", url=url, fallback=fallback)
+    return render_template("index.html", url=url, fallback=fallback, version=APP_VERSION)
+
+
+@app.route("/healthz")
+def healthz():
+    # used by Kubernetes liveness/readiness probes
+    return {"status": "ok", "version": APP_VERSION}
 
 
 if __name__ == "__main__":

@@ -1,0 +1,93 @@
+name: Build, push y actualizar manifiestos (GitOps)
+
+on:
+  push:
+    branches: [gitops-argocd]
+    # Si solo cambian manifiestos/documentación no hace falta reconstruir la imagen.
+    # (Además evita un bucle: el propio workflow hace commit sobre k8s/.)
+    paths-ignore:
+      - "k8s/**"
+      - "argocd/**"
+      - "docs/**"
+      - "**.md"
+  workflow_dispatch: {}
+
+# Evita que dos ejecuciones simultáneas compitan al hacer commit de los manifiestos
+concurrency:
+  group: gitops-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # necesario para hacer push del manifiesto actualizado
+
+env:
+  IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cat-gif-app
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Calcular tag de la imagen (SHA corto del commit)
+        id: vars
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # QEMU + Buildx permiten construir para amd64 y arm64 (Macs Apple Silicon con minikube)
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build y push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.vars.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-manifests:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Actualizar tag de imagen en k8s/deployment.yaml
+        env:
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+        run: |
+          sed -i -E "s#(image: docker.io/[^/]+/cat-gif-app):.*#\1:${TAG}#" k8s/deployment.yaml
+          sed -i -E "/name: APP_VERSION/{n;s#value: .*#value: \"${TAG}\"#}" k8s/deployment.yaml
+          git diff
+
+      - name: Commit y push (ArgoCD detectará este cambio)
+        env:
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/deployment.yaml
+          if git diff --cached --quiet; then
+            echo "Sin cambios en los manifiestos"; exit 0
+          fi
+          git commit -m "ci: desplegar imagen ${TAG}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
